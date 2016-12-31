@@ -1,4 +1,4 @@
-# deterministc LFH
+# deterministic LFH
 
 Windows have done a lot of work on the NT heap internals, replacing the super-old Windows XP lookaside with the LFH (Low Fragmentation Heap, the current front end). I'm not going to talk about the LFH internals, since I assume it's trivial knowledge (we all love to exploit corruptions on the LFH, or in the Page/NonPagePoolNx in the kernel). Also, there are simply *excellent* papers and works describing it in very nice ways. I personally feel I owe a lot to Chris Valasek:
 
@@ -22,7 +22,7 @@ The implementation is really simple. We can find it in the ntdll!RtlpCreateLowFr
 
 ![alt text](https://github.com/saaramar/Deterministic_LFH/raw/master/images/RtlpInitializeLfhRandomDataArray.png "")
 
-RtlpInitializeLfhRandomDataArray will fill the RtlpLowFragHeapRandomData array with 0x100 random values. This random array will then be used with some other value which together are used to determine some position value. From this position, we look for the first free chunk to return to the user. You can see it all in the initialization of the SegSegment in ntdll!RtlpSubSegmentInitialize. Really simple, right?
+RtlpInitializeLfhRandomDataArray will fill the RtlpLowFragHeapRandomData array with 0x100 random values. This random array will then be used with some other value which together are used to determine some position value. From this position, we look for the first free chunk in the relevant userblocks to return to the user. You can see it all in the initialization of the SubSegment in ntdll!RtlpSubSegmentInitialize. Really simple, right?
 
 ## Nice attack
 
