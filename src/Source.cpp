@@ -80,7 +80,7 @@ STATUS getFreedChunk(HANDLE hHeap, size_t size) {
 	
 	chunk = HeapAlloc(hHeap, 0x0, size);
 	HeapFree(hHeap, 0x0, chunk);
-	printf("[*] Chunk 0x%p is freed in the userblocks for bucket size 0x%x\n", chunk, size);
+	printf("[*] Chunk 0x%p is freed in the userblocks for bucket size 0x%zx\n", chunk, size);
 
 	for (size_t i = 0; i < RandomDataArrayLength - 1; ++i) {
 		tmp_chunk = HeapAlloc(hHeap, 0x0, size);
@@ -115,7 +115,7 @@ STATUS getContiguousAllocations(HANDLE hHeap, size_t size) {
 	LPVOID chunk, tmp_chunk;
 
 	chunk = HeapAlloc(hHeap, 0x0, size);
-	printf("[*] Chunk 0x%p is freed in the userblocks for bucket size 0x%x\n", chunk, size);
+	printf("[*] Chunk 0x%p is freed in the userblocks for bucket size 0x%zx\n", chunk, size);
 
 	for (size_t i = 0; i < RandomDataArrayLength - 1; ++i) {
 		tmp_chunk = HeapAlloc(hHeap, 0x0, size);
