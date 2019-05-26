@@ -141,3 +141,95 @@ RtlpLowFragHeapRandomData == 0x00007ffbe7e30000, currIdx == 0x00000000000000d0
 RtlpLowFragHeapRandomData == 0x00007ffbe7e30000, currIdx == 0x00000000000000d1
 RtlpLowFragHeapRandomData == 0x00007ffbe7e30000, currIdx == 0x00000000000000d2
 ```
+
+## Uniform Distribution
+
+Well, if you stop and think about it, there is still an issue with the this behavior. It isn't as important as the previous one which actually bypasses the randomization mitigation, but is still interesting. Given the above logic, the end of the array will be used more frequently than its beginning (in ntdll!RtlpLowFragHeapRandomData). In other words - the probability of the last index to be used is much higher than index 0, because using index 0 happen only if the counter is reset to 0 when we reach 0xff. Ideally, the random distribution should be uniform over the entire range [0x0, 0xff].
+
+That's why the code was changed again. The index the code picks from is reset to a random index when the MSB and LSB of the current index are equal (see the branch screenshot above). Now, since the higher byte was 0 all the time, it meant the only time this happens is after the lower byte is incremented from 0xff back to 0 (just like the traces you can see [here](https://github.com/saaramar/Deterministic_LFH/blob/master/debug_traces/build_16179_traces.txt)). However, now that the higher byte changes too, the indices will look like this:
+
+```
+0:004> bp ntdll!RtlpLowFragHeapAllocFromContext+180 ".printf \"currIDx == 0x%x\\r\\n\", @ax;g"
+0:004> g
+currIDx == 0x7566
+currIDx == 0x7567
+currIDx == 0x7568
+currIDx == 0x7569
+currIDx == 0x756a
+currIDx == 0x756b
+currIDx == 0x756c
+currIDx == 0x756d
+currIDx == 0x756e
+currIDx == 0x756f
+currIDx == 0x7570
+currIDx == 0x7571
+currIDx == 0x7572
+currIDx == 0x7573
+currIDx == 0x7574
+currIDx == 0x7575 <-- MSB == LSB, call random
+currIDx == 0x3233
+currIDx == 0x3234
+currIDx == 0x3235
+currIDx == 0x3236
+currIDx == 0x3237
+currIDx == 0x3238
+currIDx == 0x3239
+currIDx == 0x323a
+currIDx == 0x323b
+currIDx == 0x323c
+currIDx == 0x323d
+...
+currIDx == 0x321e
+currIDx == 0x321f
+currIDx == 0x3220
+currIDx == 0x3221
+currIDx == 0x3222
+currIDx == 0x3223
+currIDx == 0x3224
+currIDx == 0x3225
+currIDx == 0x3226
+currIDx == 0x3227
+currIDx == 0x3228
+currIDx == 0x3229
+currIDx == 0x322a
+currIDx == 0x322b
+currIDx == 0x322c
+currIDx == 0x322d
+currIDx == 0x322e
+currIDx == 0x322f
+currIDx == 0x3230
+currIDx == 0x3231
+currIDx == 0x3232 <-- MSB == LSB, call random
+currIDx == 0x2526
+currIDx == 0x2527
+currIDx == 0x2528
+currIDx == 0x2529
+currIDx == 0x252a
+...
+currIDx == 0x251d
+currIDx == 0x251e
+currIDx == 0x251f
+currIDx == 0x2520
+currIDx == 0x2521
+currIDx == 0x2522
+currIDx == 0x2523
+currIDx == 0x2524
+currIDx == 0x2525 <-- MSB == LSB, call random
+currIDx == 0x5d5e
+currIDx == 0x5d5f
+currIDx == 0x5d60
+currIDx == 0x5d61
+```
+
+Take all of those values, and see the distribution:
+
+```
+>>> len(dwords_indices_from_RtlpLowFragHeapAllocFromContext)
+20370
+>>> actual_indices = []
+>>> for n in dwords_indices_from_RtlpLowFragHeapAllocFromContext:
+...     actual_indices.append(n & 0xff)
+...
+>>> Counter(actual_indices)
+Counter({0: 80, 1: 80, 2: 80, 3: 80, 4: 80, 6: 80, 7: 80, 8: 80, 9: 80, 10: 80, 11: 80, 13: 80, 14: 80, 15: 80, 16: 80, 17: 80, 52: 80, 53: 80, 55: 80, 56: 80, 57: 80, 58: 80, 59: 80, 61: 80, 62: 80, 64: 80, 65: 80, 66: 80, 67: 80, 68: 80, 69: 80, 70: 80, 71: 80, 72: 80, 73: 80, 74: 80, 75: 80, 76: 80, 77: 80, 78: 80, 79: 80, 80: 80, 81: 80, 82: 80, 84: 80, 85: 80, 86: 80, 87: 80, 88: 80, 89: 80, 90: 80, 91: 80, 92: 80, 93: 80, 94: 80, 95: 80, 97: 80, 98: 80, 99: 80, 100: 80, 101: 80, 102: 80, 103: 80, 104: 80, 105: 80, 106: 80, 107: 80, 108: 80, 109: 80, 111: 80, 112: 80, 113: 80, 114: 80, 115: 80, 116: 80, 117: 80, 118: 80, 119: 80, 120: 80, 121: 80, 173: 80, 174: 80, 175: 80, 176: 80, 177: 80, 178: 80, 179: 80, 180: 80, 181: 80, 183: 80, 184: 80, 185: 80, 186: 80, 187: 80, 189: 80, 190: 80, 191: 80, 192: 80, 193: 80, 194: 80, 195: 80, 196: 80, 197: 80, 198: 80, 200: 80, 201: 80, 202: 80, 203: 80, 204: 80, 205: 80, 206: 80, 207: 80, 208: 80, 210: 80, 211: 80, 212: 80, 213: 80, 214: 80, 215: 80, 216: 80, 219: 80, 220: 80, 221: 80, 222: 80, 223: 80, 224: 80, 225: 80, 226: 80, 227: 80, 228: 80, 229: 80, 230: 80, 231: 80, 232: 80, 233: 80, 234: 80, 235: 80, 236: 80, 238: 80, 239: 80, 240: 80, 241: 80, 242: 80, 243: 80, 244: 80, 245: 80, 246: 80, 247: 80, 248: 80, 249: 80, 251: 80, 252: 80, 253: 80, 254: 80, 255: 80, 5: 79, 12: 79, 18: 79, 19: 79, 20: 79, 22: 79, 23: 79, 24: 79, 25: 79, 27: 79, 28: 79, 30: 79, 31: 79, 32: 79, 33: 79, 34: 79, 35: 79, 36: 79, 37: 79, 38: 79, 39: 79, 40: 79, 41: 79, 42: 79, 43: 79, 44: 79, 46: 79, 47: 79, 48: 79, 49: 79, 50: 79, 51: 79, 54: 79, 60: 79, 63: 79, 83: 79, 96: 79, 110: 79, 122: 79, 123: 79, 124: 79, 126: 79, 127: 79, 128: 79, 129: 79, 130: 79, 131: 79, 132: 79, 133: 79, 135: 79, 136: 79, 137: 79, 138: 79, 139: 79, 140: 79, 141: 79, 142: 79, 143: 79, 144: 79, 146: 79, 147: 79, 148: 79, 149: 79, 150: 79, 151: 79, 152: 79, 153: 79, 154: 79, 155: 79, 156: 79, 157: 79, 158: 79, 159: 79, 160: 79, 161: 79, 162: 79, 163: 79, 164: 79, 167: 79, 168: 79, 169: 79, 170: 79, 171: 79, 172: 79, 182: 79, 188: 79, 199: 79, 209: 79, 217: 79, 218: 79, 237: 79, 250: 79, 21: 78, 26: 78, 29: 78, 45: 78, 125: 78, 134: 78, 145: 78, 165: 78, 166: 78})
+```
