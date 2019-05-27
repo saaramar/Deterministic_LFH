@@ -144,9 +144,11 @@ RtlpLowFragHeapRandomData == 0x00007ffbe7e30000, currIdx == 0x00000000000000d2
 
 ## Uniform Distribution
 
-Well, if you stop and think about it, there is still an issue with the this behavior. It isn't as important as the previous one which actually bypasses the randomization mitigation, but is still interesting. Given the above logic, the end of the array will be used more frequently than its beginning (in ntdll!RtlpLowFragHeapRandomData). In other words - the probability of the last index to be used is much higher than index 0, because using index 0 happen only if the new generated random value happens to be 0 when we reach 0xff. Ideally, the random distribution should be uniform over the entire range [0x0, 0xff].
+One important note here, is that we don’t want to pointer to the random data array (ntdll!RtlpLowFragHeapRandomData) to simply overlapped from 0xff to random index between [0x0, 0xff]. Such behavior would mean that the probability we used the values in the beginning of the random data array is much smaller than the probability we used end of the array (the probability we used RtlpLowFragHeapRandomData[0xff] is 1).
 
-That's why the code was changed again. The index the code picks from is reset to a random index when the MSB and LSB of the current index are equal (see the branch screenshot above). Now, since the higher byte was 0 all the time, it meant the only time this happens is after the lower byte is incremented from 0xff back to 0 (just like the traces you can see [here](https://github.com/saaramar/Deterministic_LFH/blob/master/debug_traces/build_16179_traces.txt)). However, now that the higher byte changes too, the indices will look like this:
+So, in order to avoid such a case, the index the code picks from is reset to a random index not at 0xff, but only when the MSB and LSB of the current index are equal (see the branch screenshot above). And it means that we actually have uniform distribution over the entire range [0, 0xff]
+
+For instance, those [traces](https://github.com/saaramar/Deterministic_LFH/raw/master/debug_traces/build_17763_traces.txt) are from build 17763:
 
 ```
 0:004> bp ntdll!RtlpLowFragHeapAllocFromContext+180 ".printf \"currIDx == 0x%x\\r\\n\", @ax;g"
